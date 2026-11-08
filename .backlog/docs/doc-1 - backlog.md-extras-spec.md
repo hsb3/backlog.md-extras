@@ -3,7 +3,7 @@ id: doc-1
 title: backlog.md-extras spec
 type: specification
 created_date: 2026-10-20 00:39
-updated_date: '2026-11-08T20:40:00Z'
+updated_date: '2026-11-08T22:36:00Z'
 ---
 Status: accepted 2026-10-18; one CLI name (decision 6) added the same day; Codex support (decision 7) added 2026-10-19; moved from `docs/spec.md` into Backlog.md as doc-1 the same day. Scope widened 2026-10-21 (decision 9). One supported layout, the guard's narrowed Bash match and its per-command bypass added the same day (decisions 14-17). Upstream: [MrLesk/Backlog.md](https://github.com/MrLesk/Backlog.md), which does not take outside changes, so every augmentation lives here as a wrapper. CLI only: no MCP server.
 
@@ -168,7 +168,7 @@ Skill (`skills/backlog-md/SKILL.md`, decision 11): the agent learns the CLI from
 - Each machine then runs `claude plugin install backlog-extras@backlog-md-extras --scope project` in the project once. Observed on Claude Code 2.1.302: the settings alone registered the marketplace on the first session, but the plugin did not load, silently (no wrapper, no guard, no doctor), until this install ran.
 - Direct install: `claude plugin marketplace add hsb3/backlog.md-extras`, then `claude plugin install backlog-extras@backlog-md-extras`.
 - The plugin does not install Backlog.md itself; the session doctor reports when no tested release is found. Hooks come only from the plugin; `install.sh` installs no hook command.
-- Terminal install, no clone: `gh api -H 'Accept: application/vnd.github.raw' 'repos/hsb3/backlog.md-extras/contents/install.sh?ref=v0.7.0' | sh`, which installs pinned Backlog.md with npm under `../share/backlog-extras/upstream` (skipped when that stable copy is pinned), independent of version-managed Node global packages, the wrapper as `bl`, and the skill as `../share/backlog-extras/SKILL.md` beside the install dir, for `bl` to print. A relative `BACKLOG_EXTRAS_INSTALL_DIR` is resolved to absolute, and the skill goes beside the install dir's physical parent, where `bl` looks after resolving symlinks. All downloaded files use the same release tag (v0.6.0 for this release). BACKLOG_EXTRAS_REF may name a reviewed branch or commit with matching release identity; the ref is resolved once through the GitHub commits API, and every artifact fetch uses the returned full commit SHA. Empty, abbreviated and invalid SHAs are rejected before installation. Tags must exist before distributing the one-liner. Setup installs requirements.json and its checker beside the terminal skill and verifies the installed wrapper resolves the pin.
+- Terminal install, no clone: `gh api -H 'Accept: application/vnd.github.raw' 'repos/hsb3/backlog.md-extras/contents/install.sh?ref=v0.7.0' | sh`, which installs pinned Backlog.md with npm under `../share/backlog-extras/upstream` (skipped when that stable copy is pinned), independent of version-managed Node global packages, the wrapper as `bl`, and the skill as `../share/backlog-extras/SKILL.md` beside the install dir, for `bl` to print. A relative `BACKLOG_EXTRAS_INSTALL_DIR` is resolved to absolute, and the skill goes beside the install dir's physical parent, where `bl` looks after resolving symlinks. All downloaded files use the same release tag (v0.7.0 for this release). BACKLOG_EXTRAS_REF may name a reviewed branch or commit with matching release identity; the ref is resolved once through the GitHub commits API, and every artifact fetch uses the returned full commit SHA. Empty, abbreviated and invalid SHAs are rejected before installation. Tags must exist before distributing the one-liner. Setup installs requirements.json and its checker beside the terminal skill and verifies the installed wrapper resolves the pin.
 - Codex, once per machine: `codex plugin marketplace add hsb3/backlog.md-extras`, `codex plugin add backlog-extras@backlog-md-extras`, then trust both hooks in `/hooks`. Codex reads `.agents/plugins/marketplace.json`, which points at `distributions/openai`. An untrusted hook never runs, so it supplies no guard or session guidance; Codex reports hooks needing review at startup. Review and trust the current definitions in /hooks and start a new session after installing or updating.
 - Releases: bump `version` in `plugin.json`, both host manifests and `requirements.json` for every change users should receive, then `python3 scripts/pack_plugin.py --sync`; Claude Code consumers update with `claude plugin update backlog-extras@backlog-md-extras` or marketplace auto-update; Codex consumers with `codex plugin marketplace upgrade backlog-md-extras` (verified on codex-cli 0.163.0 with a temporary Git marketplace: installed files and version refresh).
 
@@ -199,8 +199,16 @@ Every new check is first watched failing against the code it guards.
 2. Read upstream's release notes since the newest tested release, and compare `backlog task edit --help` with the wrapper's `TASK_EDIT_SWITCHES`.
 3. Append `<new>` to `tested.backlog.md` in requirements.json and to its derived `BACKLOG_TESTED` in bin/backlog; to make it the installed release, also set `pins.backlog.md` and `BACKLOG_VERSION`. Host pins and dependency requirements live in that same declaration. Drop a release from the list only when the wrapper stops supporting it.
 4. `bin/gate`. On failure, fix the wrapper or revert: `npm install -g backlog.md@<old>` and leave the lists.
-5. Update `version` in plugin.json, both host manifests, pluginVersion in requirements.json, the installer release and release-tag examples; `python3 scripts/pack_plugin.py --sync`. Run the gate, merge, tag `vX.Y.Z` on main, and run the Prepare draft release workflow (docs/releases.md) when release publication is authorized.
+5. Cut a release (below).
 6. Each machine: rerun the `install.sh` one-liner (terminal), `claude plugin update backlog-extras@backlog-md-extras`, and for Codex `codex plugin marketplace upgrade backlog-md-extras` (verified on codex-cli 0.163.0), then start a new session and review `/hooks`. Upgrade may remove the previous cache path; existing sessions hold an absolute wrapper path that can stop working.
+
+### Release
+
+1. Bump `version` in plugin.json, both host manifests and pluginVersion in requirements.json, and the `?ref=vX.Y.Z` examples in README and this spec; `python3 scripts/pack_plugin.py --sync`; `bin/gate`.
+2. Commit to main and push. Wait for the Tests workflow on that commit to pass on both OSes.
+3. Tag that green commit: `git tag -a vX.Y.Z -m vX.Y.Z <sha> && git push origin vX.Y.Z`. Tags are annotated, `v`-prefixed semver, and only ever on a main commit whose CI passed.
+4. `gh workflow run release.yml -f tag=vX.Y.Z`; it reruns the gate on the tag and creates a draft release with attested ZIPs. Check the draft's assets and notes, then publish it.
+5. A tag never moves once its release is published: fix forward with a patch release. A tag with no published release may be moved only to repair it (for example a tag whose CI failed), and the move is noted in the commit or release notes.
 
 ### Rebuild from nothing (unverified until run on a clean machine)
 

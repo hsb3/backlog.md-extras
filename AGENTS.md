@@ -29,6 +29,9 @@
 - The wrapper accepts every Backlog.md release in `requirements.json` `tested`
   and the installer installs the one in `pins`. To add a release, follow
   "Upgrade Backlog.md" in doc-1.
+- Releases follow "Release" in doc-1: tag `vX.Y.Z` (annotated) only on a main
+  commit whose Tests workflow passed, and never move a tag once its release is
+  published.
 - Shell must run on Bash 3.2 (macOS `/bin/bash`): no `${x,,}`, no `mapfile`, and
   guard empty arrays under `set -u` with `${a[@]+"${a[@]}"}`.
 - `docs/*.md` and `README.md` are user-facing and ship in every package.
