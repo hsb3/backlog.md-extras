@@ -1,0 +1,46 @@
+# Every check: bin/gate on macOS and Linux with the declared host and runtime pins.
+name: Tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '26.10.0'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.14.8'
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update
+            sudo apt-get install -y jq shellcheck
+          else
+            brew install jq shellcheck
+          fi
+      - name: Install declared CLI pins
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+          pins = json.load(open('plugins/backlog-extras/requirements.json'))['pins']
+          subprocess.run(['npm', 'install', '-g', 'backlog.md@' + pins['backlog.md'],
+                          '@openai/codex@' + pins['codex'],
+                          '@anthropic-ai/claude-code@' + pins['claude'],
+                          '@fission-ai/openspec@' + pins['openspec']], check=True)
+          PY
+      - name: Run all checks
+        run: bin/gate

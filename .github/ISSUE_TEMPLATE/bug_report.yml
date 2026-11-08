@@ -1,0 +1,91 @@
+name: Bug report
+description: Something in backlog-extras did not behave as documented.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands or agent actions, in order, starting from a fresh session if possible.
+      placeholder: |
+        1. Start a Claude Code session in a project with `.backlog/config.yml`
+        2. Run `backlog ...`
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Where it happened
+      options:
+        - Claude Code session
+        - Codex session
+        - Terminal (`bl` / wrapper run directly)
+        - install.sh / setup
+        - Other (say below)
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: backlog-extras version
+      description: The `version` in the installed plugin.json.
+      placeholder: "0.7.0"
+    validations:
+      required: true
+
+  - type: input
+    id: backlog-version
+    attributes:
+      label: Backlog.md version
+      description: Output of `backlog --version` (or `bl --version`).
+      placeholder: "1.55.3"
+    validations:
+      required: true
+
+  - type: input
+    id: host-version
+    attributes:
+      label: Harness version
+      description: Output of `claude --version` or `codex --version`, if relevant.
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "macOS 15.4 / Ubuntu 24.04 / WSL2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: conditions
+    attributes:
+      label: Conditions when it occurred
+      description: |
+        Anything about the setup that might matter: project layout (`.backlog/` vs `backlog/`),
+        which `backlog` is on PATH (`command -v backlog`), Node version, whether it started after
+        an update, and whether it happens every time or only sometimes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and error messages
+      description: |
+        Paste the full error output, the session-doctor message from session start, and any hook
+        output. Remove secrets and private paths first. Formatted as code automatically.
+      render: text
+    validations:
+      required: true

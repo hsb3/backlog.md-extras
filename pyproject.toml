@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests/unit"]
+pythonpath = ["tests/unit"]
+addopts = "-ra -q --import-mode=importlib"

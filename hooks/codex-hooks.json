@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "PreToolUse": [{"matcher": "apply_patch|Bash", "hooks": [{"type": "command", "command": "BACKLOG_EXTRAS_HARNESS=codex \"${PLUGIN_ROOT}/hooks/backlog-guard/hook.sh\"", "timeout": 10, "statusMessage": "backlog-extras: checking for direct backlog writes"}]}],
+    "SessionStart": [{"hooks": [{"type": "command", "command": "BACKLOG_EXTRAS_HARNESS=codex \"${PLUGIN_ROOT}/hooks/session-doctor/hook.sh\"", "timeout": 15, "statusMessage": "backlog-extras: checking backlog.md pin"}]}]
+  }
+}

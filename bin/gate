@@ -1,0 +1,45 @@
+#!/bin/sh
+# Run every check: one gate for local and CI runs. Dev only; never shipped.
+#
+# How it works:
+#   1. Changes to the repository root.
+#   2. With no arguments, runs scripts/checks.sh, then pytest on tests/unit and
+#      tests/integration. checks.sh covers prerequisites, the wrapper self-test on
+#      every tested Backlog.md release, hook tests, installer, Codex lifecycle and lint.
+#   3. With arguments, runs only pytest on them.
+#   pytest runs on Python 3.12 with pytest 8 and PyYAML 6, provided by uv.
+#
+# Usage:
+#   bin/gate                      every check
+#   bin/gate [PYTEST_ARGS...]     e.g. bin/gate tests/unit
+#
+# Environment:
+#   PLUGIN_LIVE=1 adds the one live Codex turn to the integration tests.
+#
+# Reads:
+#   The repository and the tools requirements.json declares for development; uv
+#   and npm download what they have not cached.
+#
+# Writes:
+#   Test output to stdout; .pytest_cache and __pycache__ folders in the repository;
+#   tested Backlog.md releases under ~/.cache/backlog-extras/tested.
+#
+# Exit codes:
+#   0: every check passed.
+#   1: a check failed.
+#   With arguments, pytest's own codes: 2-4 interrupted, internal error or bad
+#   arguments; 5 no tests collected.
+#
+# Limits:
+#   Integration tests skip when a host CLI is absent; with no arguments the
+#   prerequisite step fails first in that case.
+set -u
+cd "$(dirname "$0")/.." || exit 1
+pytest() {
+  uv run --no-project --python 3.12 --with 'pytest>=8,<9' --with 'pyyaml>=6,<7' python -m pytest "$@"
+}
+[ $# -gt 0 ] && { pytest "$@"; exit; }
+rc=0
+sh scripts/checks.sh || rc=1
+if pytest tests/unit tests/integration; then echo "PASS: pytest unit and integration"; else echo "FAIL: pytest unit and integration"; rc=1; fi
+exit $rc

@@ -1,0 +1,14 @@
+{
+  "name": "backlog-md-extras",
+  "owner": {
+    "name": "Henry S. Burden III"
+  },
+  "description": "CLI-only Backlog.md for agents: a backlog wrapper that adds the operations Backlog.md lacks, a guard against direct writes to the backlog folder, and a session check of the Backlog.md release.",
+  "plugins": [
+    {
+      "name": "backlog-extras",
+      "source": "./distributions/claude",
+      "description": "CLI-only Backlog.md for agents: a backlog wrapper that adds the operations Backlog.md lacks, a guard against direct writes to the backlog folder, and a session check of the Backlog.md release."
+    }
+  ]
+}

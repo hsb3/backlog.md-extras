@@ -1,0 +1,36 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "backlog-extras",
+  "version": "0.7.0",
+  "description": "CLI-only Backlog.md for agents: a backlog wrapper that adds the operations Backlog.md lacks, a guard against direct writes to the backlog folder, and a session check of the Backlog.md release.",
+  "author": {
+    "name": "Henry S. Burden III"
+  },
+  "homepage": "https://github.com/hsb3/backlog.md-extras",
+  "repository": "https://github.com/hsb3/backlog.md-extras",
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Backlog Extras",
+        "shortDescription": "CLI-only Backlog.md for agents",
+        "longDescription": "Adds missing Backlog.md CLI operations, checks the installed Backlog.md release and guards direct board writes in local Codex sessions. Requires local dependencies and trusted hooks.",
+        "developerName": "Henry S. Burden III",
+        "category": "Developer Tools",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://github.com/hsb3/backlog.md-extras",
+        "supportURL": "https://github.com/hsb3/backlog.md-extras/issues",
+        "privacyPolicyURL": "https://github.com/hsb3/backlog.md-extras/blob/main/docs/privacy.md",
+        "defaultPrompt": [
+          "List tasks on this Backlog.md board using the backlog-extras wrapper."
+        ],
+        "brandColor": "#235789",
+        "composerIcon": "./assets/icon.svg",
+        "logo": "./assets/icon.svg"
+      }
+    }
+  }
+}

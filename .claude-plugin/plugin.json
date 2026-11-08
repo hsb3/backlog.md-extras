@@ -1,0 +1,16 @@
+{
+  "name": "backlog-extras",
+  "version": "0.7.0",
+  "description": "CLI-only Backlog.md for agents: a backlog wrapper that adds the operations Backlog.md lacks, a guard against direct writes to the backlog folder, and a session check of the Backlog.md release.",
+  "author": {
+    "name": "Henry S. Burden III"
+  },
+  "homepage": "https://github.com/hsb3/backlog.md-extras",
+  "repository": "https://github.com/hsb3/backlog.md-extras",
+  "license": "MIT",
+  "displayName": "Backlog Extras",
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://github.com/hsb3/backlog.md-extras/blob/main/docs/claude.md",
+  "supportUrl": "https://github.com/hsb3/backlog.md-extras/issues",
+  "privacyPolicyUrl": "https://github.com/hsb3/backlog.md-extras/blob/main/docs/privacy.md"
+}

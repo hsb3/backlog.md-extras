@@ -1,0 +1,6 @@
+{
+  "event": "SessionStart",
+  "timeout": 15,
+  "statusMessage": "backlog-extras: checking backlog.md pin",
+  "description": "In a Backlog.md project, put the plugin's backlog wrapper first on PATH, warn when the real backlog is missing or off the pin, and brief the agent."
+}

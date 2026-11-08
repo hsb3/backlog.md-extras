@@ -1,0 +1,51 @@
+{
+  "pluginVersion": "0.7.0",
+  "pins": {
+    "backlog.md": "1.55.3",
+    "codex": "0.163.0",
+    "claude": "2.1.310",
+    "openspec": "1.14.3"
+  },
+  "tested": {
+    "backlog.md": ["1.54.0", "1.55.0", "1.55.1", "1.55.2", "1.55.3"]
+  },
+  "ci": { "node": "26.10.0", "python": "3.14.8", "runners": ["ubuntu-24.04", "macos-15"] },
+  "actions": {
+    "actions/checkout": "d23441a48e516b6c34aea4fa41551a30e30af803",
+    "actions/setup-node": "249970729cb0ef3589644e2896645e5dc5ba9c38",
+    "actions/setup-python": "ece7cb06caefa5fff74198d8649806c4678c61a1",
+    "astral-sh/setup-uv": "07a047e608db84b3d8c06cd9a7c7dcc9c355c18e"
+  },
+  "platforms": ["Darwin", "Linux"],
+  "runtime": {
+    "bash": { "minimum": "3.2", "args": ["--version"] },
+    "git": { "minimum": "2.25.0", "args": ["--version"] },
+    "python3": { "minimum": "3.8", "args": ["--version"] },
+    "jq": { "minimum": "1.6", "args": ["--version"] }
+  },
+  "install": {
+    "node": { "minimum": "22.0.0", "args": ["--version"] },
+    "npm": { "minimum": "10.0.0", "args": ["--version"] }
+  },
+  "remote-install": {
+    "gh": { "minimum": "2.0.0", "args": ["--version"] }
+  },
+  "development": {
+    "git": { "minimum": "2.31.0", "args": ["--version"] },
+    "python3": { "minimum": "3.9", "args": ["--version"] },
+    "perl": { "minimum": "5.0.0", "args": ["-e", "print $^V"] },
+    "npm": { "minimum": "10.0.0", "args": ["--version"] },
+    "uv": { "minimum": "0.5.0", "args": ["--version"] },
+    "shellcheck": { "minimum": "0.9.0", "args": ["--version"] }
+  },
+  "sshMarketplace": ["git", "ssh"],
+  "systemCommands": ["awk", "basename", "cat", "chmod", "cmp", "cp", "cut", "date", "dirname", "env", "find", "grep", "head", "install", "ln", "mkdir", "mktemp", "rm", "sed", "sh", "sort", "tail", "tee", "touch", "uname", "wc"],
+  "notes": {
+    "pins": "Backlog.md is the release install.sh installs and CI runs on. Codex, Claude and OpenSpec are the exact versions required by the development gate; installed consumers may use newer hosts at their own compatibility risk.",
+    "tested": "Backlog.md releases the wrapper's added commands accept. The gate runs the wrapper self-test against each; the pin must be one of them.",
+    "ci": "Exact runtime versions for CI; runtime minimums above are checked separately.",
+    "remote-install": "Only piped setup needs gh and GitHub access. An SSH marketplace install also needs git and an SSH client; authentication is managed by the host.",
+    "systemCommands": "Provided by the supported OS. GNU and BSD variants are supported; no separate package version pin.",
+    "platforms": "macOS and Linux, including WSL. Native Windows is unsupported."
+  }
+}

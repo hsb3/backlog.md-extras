@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Check the bundled dependency declaration without installing or changing anything."""
+import argparse
+import json
+import platform
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+p = argparse.ArgumentParser(description=__doc__)
+p.add_argument("mode", choices=("runtime", "install", "remote-install", "development"))
+here = Path(__file__).resolve().parent
+p.add_argument("--requirements", type=Path, default=(here if (here / "requirements.json").is_file() else here.parent) / "requirements.json")
+a = p.parse_args()
+try:
+    requirements = json.loads(a.requirements.read_text())
+except (OSError, ValueError) as e:
+    sys.exit(f"backlog-extras: cannot read requirements.json: {e}")
+errors = []
+if platform.system() not in requirements["platforms"]:
+    errors.append(f"unsupported platform {platform.system()}; use macOS, Linux or WSL")
+groups = ["runtime"]
+if a.mode in ("install", "remote-install"):
+    groups.append("install")
+if a.mode in ("remote-install", "development"):
+    groups.append(a.mode)
+dependencies = {k: v for group in groups for k, v in requirements[group].items()}
+if a.mode == "development":
+    dependencies.update({name: {"exact": version, "args": ["--version"]}
+                         for name, version in requirements["pins"].items() if name != "backlog.md"})
+
+
+def version(text):
+    match = re.search(r"\d+(?:\.\d+)+", text)
+    return tuple(int(n) for n in match.group().split(".")) if match else ()
+
+
+for command, spec in dependencies.items():
+    want = spec.get("exact", spec.get("minimum"))
+    label = "=" if "exact" in spec else ">="
+    if not shutil.which(command):
+        errors.append(f"missing required dependency {command} ({label}{want})")
+        continue
+    try:
+        result = subprocess.run([command, *spec["args"]], capture_output=True, text=True, timeout=10)
+        found = version(result.stdout + result.stderr)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        errors.append(f"required dependency {command} could not run: {e}")
+        continue
+    if result.returncode or not found or (found != version(want) if "exact" in spec else found < version(want)):
+        errors.append(f"required dependency {command} must be {label}{want}; found {'.'.join(map(str, found)) or 'unknown'}")
+for command in requirements["systemCommands"]:
+    if not shutil.which(command):
+        errors.append(f"missing required system command {command}")
+for error in errors:
+    print(f"backlog-extras: {error}; see {a.requirements}", file=sys.stderr)
+sys.exit(bool(errors))

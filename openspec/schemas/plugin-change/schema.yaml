@@ -1,0 +1,76 @@
+name: plugin-change
+version: 2
+description: "A plugin feature or behavior change: proposal → specs (each scenario mapped to an eval case) → design (drafted and fresh-context reviewed with EGM, Approved). Implementation is tracked in backlog.md, not here."
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Who it is for, the task it does, how success is known, and the capabilities it touches
+    template: proposal.md
+    instruction: |
+      If `.dev/egm/concepts_brief.md` exists (from `/egm:egm-brainstorm`), build
+      the proposal from it and keep its agreed direction; do not reopen settled
+      trade-offs. Otherwise ask for the frame: who uses the plugin, the task it
+      does, and how anyone will know it works. Stop if any of the three is missing.
+
+      Sections, at most one page:
+      - **Frame**: the three sentences above.
+      - **What Changes**: one bullet per behavior a host user will notice. No file
+        paths or implementation detail.
+      - **Non-goals**: what this change deliberately does not do.
+      - **Capabilities**: New Capabilities (each becomes
+        `specs/<capability>/spec.md`; name one per skill or reviewer, kebab-case)
+        and Modified Capabilities (exact paths from `openspec list --specs`).
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Behavior deltas; every scenario names the eval case that proves it
+    template: spec.md
+    instruction: |
+      Describe what a host user observes, never internals. One capability per
+      skill or reviewer. Cover, for each skill: a request it must take, a request
+      it must not take, what it writes, and what it does when input is missing.
+
+      Format: `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`, then
+      `### Requirement: <name>` with SHALL/MUST text under 500 characters, then
+      `#### Scenario: <name>` (exactly four hashes) with **WHEN**/**THEN** bullets.
+      New capabilities start with `## Purpose` (one or two sentences, 50+
+      characters). MODIFIED copies the whole existing requirement block.
+
+      Every scenario ends with one line `- **EVAL** evals/<skill>/<case>` naming
+      the `claude plugin eval` case that proves it. The case may not exist yet;
+      the build creates it before any skill text changes, and `bin/gate` fails
+      while a named case is missing.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: The EGM design document, reviewed by fresh-context reviewers before code changes
+    template: design.md
+    instruction: |
+      The owner drafts this with `/egm:egm-draft` from the proposal and specs,
+      reviews it with `/egm:egm-review <path to this design.md>`, and settles
+      findings with `/egm:egm-resolve`. EGM skills start only from slash
+      commands: when asked to write the design yourself, fill the template, then
+      tell the owner to run the review. Do not mark the design Approved yourself.
+
+      Required sections are in the template: skills and trigger phrases,
+      reviewers and their tools, bundled files (skills, references, resources,
+      scripts), hosts in scope, image assets, and anything that needs hooks, MCP
+      servers or apps together with how the packer and tests must change.
+      Record every reviewer finding you rejected and why under Review.
+    requires:
+      - specs
+
+apply:
+  requires: [ design ]
+  instruction: |
+    Build only after design.md says `Status: Approved`. Design ends here; the
+    build is tracked as backlog.md tasks (`backlog task create ...`, see
+    openspec/WORKFLOW.md), never as a task list in this change. Create one task
+    per eval case the specs name, then the skills, references, resources and
+    agents, then `python3 scripts/pack_plugin.py --sync` and `bin/gate`, then
+    the verify tier from TESTING.md. Each task names the scenario or file it
+    satisfies. Finish with `bin/gate` green and the TESTING.md host rows, then
+    `openspec archive <change>`.

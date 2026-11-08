@@ -1,0 +1,11 @@
+schema: plugin-change
+
+context: |
+  This repository is an agent plugin for Claude Code and Codex that keeps agents
+  on the Backlog.md CLI. Behavior is what a host user sees: which requests route
+  to the backlog-md skill, which backlog commands the agent runs, what the
+  wrapper's added commands do, and which direct board writes the guard denies.
+  Every spec scenario names the eval case that proves it with an `EVAL` line.
+  Shipped files are packed from an allowlist: skills, the backlog wrapper in
+  bin/, the backlog-guard and session-doctor hooks, and requirements.json. MCP
+  servers and apps are refused unless a change's design adds them.

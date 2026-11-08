@@ -1,0 +1,492 @@
+#!/usr/bin/env python3
+"""backlog.md-extras wrapper: passes through to the real backlog and adds the operations it lacks.
+
+The plugin ships it as `backlog` (first on PATH in agent sessions); install.sh installs it as `bl`.
+
+The added commands are COMMANDS at the bottom of this file; `backlog --help` lists them after
+upstream's help. CORRECTIONS are upstream commands whose instruction writes it undoes (init, agents,
+the config wizard). Anything else is handed to the real backlog unchanged. Added and corrected
+commands run only against a release in BACKLOG_TESTED, each of which the gate runs tests/selftest.sh against.
+"""
+import argparse
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+BACKLOG_VERSION = "1.55.3"  # derived from requirements.json; the gate rejects drift
+# releases the added commands accept (requirements.json tested); install.sh installs BACKLOG_VERSION
+BACKLOG_TESTED = ("1.54.0", "1.55.0", "1.55.1", "1.55.2", "1.55.3")
+
+
+def is_wrapper(path):
+    with open(path, "rb") as f:
+        return b"backlog.md-extras wrapper" in f.read(4096)
+
+
+def real_backlog():
+    # skip every backlog-extras wrapper on PATH (this file and other plugin copies), or wrappers exec each other forever
+    here = Path(__file__).resolve().parent
+    fallback = "share/backlog-extras/upstream/bin"
+    managed = [here.parent / fallback, Path.home() / ".local" / fallback]
+    for d in managed:
+        c = Path(d) / "backlog"
+        if c.is_file() and os.access(c, os.R_OK | os.X_OK) and not is_wrapper(c):
+            try:
+                result = subprocess.run([str(c), "--version"], capture_output=True, text=True, timeout=10)
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            if result.returncode == 0 and result.stdout.strip() in BACKLOG_TESTED:
+                return str(c)
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        c = Path(d or ".") / "backlog"
+        if c.is_file() and os.access(c, os.R_OK | os.X_OK) and not is_wrapper(c):
+            # A mise shim exists even when the selected Node version has no backlog.
+            if c.resolve().name == "mise" and subprocess.run(
+                    [str(c), "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+                continue
+            return str(c)
+    print("backlog-extras: no real backlog on PATH or in the stable install; run backlog.md-extras install.sh", file=sys.stderr)
+    sys.exit(127)
+
+
+def found_version():
+    return subprocess.run([real_backlog(), "--version"], capture_output=True, text=True).stdout.strip()
+
+
+def require_pinned_backlog():
+    # this wrapper edits backlog's files directly, so an untested release could be corrupted silently
+    found = found_version()
+    if found not in BACKLOG_TESTED:
+        sys.exit(f"backlog-extras: tested against backlog.md {', '.join(BACKLOG_TESTED)}, found {found or 'none'}. "
+                 f"Install backlog.md {BACKLOG_VERSION}, or add {found or 'it'} to the tested list once ./gate.sh passes on it.")
+
+
+def start_dir():
+    return Path(os.environ.get("BACKLOG_CWD") or os.getcwd()).resolve()
+
+
+LAYOUT = ".backlog/config.yml at the project root"  # the one layout backlog-extras supports (doc-1)
+CONFIGS = (".backlog/config.yml", "backlog/config.yml", "backlog.config.yml")  # supported first, then upstream's others
+
+
+def find_config():
+    # the nearest config of any layout wins, so an unsupported nested project is not mistaken for its parent
+    start = start_dir()
+    for d in [start, *start.parents]:
+        for name in CONFIGS:
+            if (d / name).is_file():
+                return d / name
+    return None
+
+
+def find_backlog_dir():
+    c = find_config()
+    return c.parent if c and c.parts[-2:] == (".backlog", "config.yml") else None
+
+
+def backlog_dir():
+    c = find_config() or sys.exit("backlog-extras: no backlog project found (run backlog init)")
+    return find_backlog_dir() or sys.exit(f"backlog-extras: this project keeps its Backlog.md config in {c}; backlog-extras supports only {LAYOUT}")
+
+
+def find(kind, key):
+    folder = backlog_dir() / kind
+    key = key.lower()
+    for f in sorted(folder.rglob("*.md")):  # docs nest under -p subfolders
+        head, _ = split(f.read_text())
+        meta = dict(line.split(": ", 1) for line in head.splitlines() if ": " in line)
+        if meta.get("id", "").lower() == key or meta.get("title", "").strip("'\"").lower() == key:
+            return f
+    sys.exit(f"backlog-extras: no {kind[:-1]} matching {key!r} in {folder}")
+
+
+def split(text):
+    """Return (frontmatter lines without fences, body)."""
+    if not text.startswith("---\n"):
+        sys.exit("backlog-extras: file has no frontmatter; refusing to edit")
+    end = text.index("\n---\n", 3)
+    return text[4:end], text[end + 5:]
+
+
+def join(head, body):
+    return f"---\n{head}\n---\n{body}"
+
+
+def set_field(head, field, value):
+    lines = [l for l in head.splitlines() if not l.startswith(f"{field}:")]
+    quoted = "'" + value.replace("'", "''") + "'"  # YAML single-quoted, safe for any text
+    return "\n".join(lines + [f"{field}: {quoted}"])
+
+
+def id_only(prog, argv):
+    p = argparse.ArgumentParser(prog=prog)
+    p.add_argument("id")
+    return p.parse_args(argv).id
+
+
+def decision_view(argv):
+    print(find("decisions", id_only("backlog decision view", argv)).read_text(), end="")
+
+
+def decision_remove(argv):
+    key = id_only("backlog decision remove", argv)
+    find("decisions", key).unlink()
+    print(f"Removed decision {key}")
+
+
+def decision_update(argv):
+    p = argparse.ArgumentParser(prog="backlog decision update")
+    p.add_argument("id")
+    p.add_argument("--content")
+    p.add_argument("--status")
+    a = p.parse_args(argv)
+    if a.content is None and a.status is None:
+        p.error("update needs --content and/or --status")
+    f = find("decisions", a.id)
+    head, body = split(f.read_text())
+    if a.status is not None:
+        head = set_field(head, "status", a.status)
+    if a.content is not None:
+        body = a.content if a.content.endswith("\n") else a.content + "\n"
+    f.write_text(join(head, body))
+    print(f"Updated decision {a.id}\nPath: {f}")
+
+
+def milestone_view(argv):
+    print(find("milestones", id_only("backlog milestone view", argv)).read_text(), end="")
+
+
+def milestone_update(argv):
+    p = argparse.ArgumentParser(prog="backlog milestone update")
+    p.add_argument("id")
+    p.add_argument("--description", required=True)
+    a = p.parse_args(argv)
+    f = find("milestones", a.id)
+    head, _ = split(f.read_text())
+    # same body shape `backlog milestone add --description` writes
+    f.write_text(join(head, f"\n## Description\n\n{a.description}\n"))
+    print(f"Updated milestone {a.id}\nPath: {f}")
+
+
+def doc_remove(argv):
+    key = id_only("backlog doc remove", argv)
+    find("docs", key).unlink()
+    print(f"Removed document {key}")
+
+
+def norm(item_id):
+    """task-001, TASK-1 and 1 name the same item to backlog; compare that way."""
+    return re.sub(r"\d+", lambda m: str(int(m.group())), item_id.strip("'\"").lower())
+
+
+def ids(*folders):
+    out = {}
+    for folder in folders:
+        for f in sorted(folder.glob("*.md")):
+            head, _ = split(f.read_text())
+            m = re.search(r"^id: *(.+)$", head, re.M)
+            if m:
+                out.setdefault(norm(m.group(1)), []).append(f)
+    return out
+
+
+def doctor(argv):
+    root = backlog_dir()  # first, so an unsupported layout fails before upstream runs
+    require_pinned_backlog()
+    # stock doctor checks archived tasks but not archived drafts, whose IDs backlog still reuses
+    rc = subprocess.call([real_backlog(), "doctor", *argv], stdin=sys.stdin)
+    rel = lambda f: f.relative_to(root.parent)
+    live_files = [f for d in ("tasks", "drafts") for f in (root / d).glob("*.md")]
+    live, archived = ids(root / "drafts"), ids(root / "archive" / "drafts")
+    reused = sorted(live.keys() & archived.keys())
+    for key in reused:
+        print(f"\nArchived draft ID reused by a live draft: {key.upper()}")
+        for f in archived[key]:
+            print(f"  archived: {rel(f)}")
+        for f in live[key]:
+            print(f"  live:     {rel(f)}")
+        # padding-insensitive, and draft-1 must not match draft-10
+        pat = re.compile(re.sub(r"\d+", lambda m: "0*" + m.group(), re.escape(key)) + r"(?!\d|\.\d)", re.I)
+        for f in live_files:
+            if f not in live[key] and pat.search(f.read_text()):
+                print(f"  referenced by: {rel(f)}")
+    if reused:
+        print("\nReferences above may now resolve to the new draft or be rejected as ambiguous."
+              " Fix them with `backlog task edit` or `backlog draft edit`.")
+    blocks = [f for f in INSTRUCTION_FILES if any(m in (file_bytes(root.parent / f) or b"") for m in UPSTREAM_MARKERS)]
+    for f in blocks:
+        print(f"\nUpstream Backlog.md instruction block in {f}: remove the block by hand;"
+              " the backlog-md skill replaces it (`backlog agents --update-instructions` prints it).")
+    sys.exit(rc or int(bool(reused or blocks)))
+
+
+# where upstream writes its agent instructions (init, agents --update-instructions) and the Claude agent (init, config)
+INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md")
+CLAUDE_AGENT = ".claude/agents/project-manager-backlog.md"
+UPSTREAM_MARKERS = (b"BACKLOG.MD GUIDELINES START", b"BACKLOG.MD MCP GUIDELINES")
+SKILL_URL = "https://github.com/hsb3/backlog.md-extras/blob/main/skills/backlog-md/SKILL.md"
+
+
+def file_bytes(f):
+    return f.read_bytes() if f.is_file() else None
+
+
+def print_skill():
+    """Print the backlog-md skill (the agent instructions that replace upstream's block) without its frontmatter."""
+    here = Path(__file__).resolve().parent
+    for f in (here.parent / "skills/backlog-md/SKILL.md", here.parent / "share/backlog-extras/SKILL.md"):
+        if f.is_file():
+            text = f.read_text()
+            return print(text.split("\n---\n", 1)[1] if text.startswith("---\n") else text, end="")
+    print(f"backlog-extras: skill text not found next to the wrapper; read it at {SKILL_URL}", file=sys.stderr)
+
+
+def run_undoing_instruction_writes(argv, root):
+    """Run upstream with the terminal (its prompts stay), then put every instruction file and the Claude
+    agent back as they were; return (upstream's exit code, the files put back or deleted, relative to root)."""
+    files = [root / f for f in (*INSTRUCTION_FILES, CLAUDE_AGENT)]
+    dirs = {d for f in files for d in f.parents if root in d.parents}
+    before = {f: file_bytes(f) for f in files}
+    new_dirs = {d for d in dirs if not d.exists()}
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):  # a signal ends upstream, not the restore below
+        signal.signal(sig, lambda *_: None)
+    try:
+        rc = subprocess.call([real_backlog(), *argv])
+    finally:
+        undone = []
+        for f, old in before.items():
+            if file_bytes(f) != old:
+                undone.append(str(f.relative_to(root)))
+                if old is None:
+                    f.unlink()
+                else:
+                    f.write_bytes(old)
+        for d in sorted(new_dirs, key=lambda d: len(d.parts), reverse=True):
+            if d.is_dir() and not any(d.iterdir()):
+                d.rmdir()
+        if undone:  # upstream's own summary still names these as created or updated
+            print(f"backlog-extras: reverted upstream's writes to {', '.join(undone)}; the backlog-md skill replaces its instructions")
+    return rc, undone
+
+
+def opt_values(argv, name):
+    return [argv[i + 1] if t == name else t.partition("=")[2]
+            for i, t in enumerate(argv) if t == name and i + 1 < len(argv) or t.startswith(name + "=")]
+
+
+def init(argv):
+    if (any(Path(d) != Path(".backlog") for d in opt_values(argv, "--backlog-dir"))
+            or "root" in [v.lower() for v in opt_values(argv, "--config-location")]):
+        usage_error(f"init: backlog-extras supports only {LAYOUT}; leave out --backlog-dir (or give .backlog) and --config-location root")
+    # upstream's existing project is a config in the init directory itself (no walk-up), any layout
+    existing = next((n for n in CONFIGS if (start_dir() / n).is_file()), None)
+    if existing not in (None, CONFIGS[0]):
+        usage_error(f"init: this directory keeps its Backlog.md config in {existing}; backlog-extras supports only {LAYOUT}")
+    # upstream defaults to backlog/; any --backlog-dir also skips its setup prompts except the project name,
+    # but on an existing project upstream rejects it ("The backlog directory is fixed after initialization")
+    if not existing and not any(t == "--backlog-dir" or t.startswith("--backlog-dir=") for t in argv):
+        argv = [*argv, "--backlog-dir", ".backlog"]
+    mode = (opt_values(argv, "--integration-mode") or ["cli"])[-1].lower()
+    if mode in ("mcp", "none") or [v.lower() for v in opt_values(argv, "--agent-instructions")[-1:]] == ["none"]:
+        os.execv(real_backlog(), ["backlog", "init", *argv])  # writes no instruction file: plain upstream
+    require_pinned_backlog()
+    # init writes into the working directory (or BACKLOG_CWD)
+    root = start_dir()
+    # upstream exits 0 on a cancelled prompt too; a re-run rewrites config.yml (same bytes), so compare mtimes
+    def stamps():
+        return {f: f.stat().st_mtime_ns for f in (root / "backlog.config.yml", *root.glob("*/config.yml")) if f.is_file()}
+    before = stamps()
+    rc, _ = run_undoing_instruction_writes(["init", *argv], root)
+    if rc == 0 and stamps() != before:
+        print_skill()
+    sys.exit(rc)
+
+
+def agents(argv):
+    if "--update-instructions" not in argv:
+        os.execv(real_backlog(), ["backlog", "agents", *argv])
+    require_pinned_backlog()
+    print_skill()
+
+
+def config(argv):
+    if argv or not find_backlog_dir():  # subcommands, and no project (upstream says so): plain upstream
+        os.execv(real_backlog(), ["backlog", "config", *argv])
+    require_pinned_backlog()
+    # the wizard's last question installs the Claude agent
+    rc, undone = run_undoing_instruction_writes(["config"], find_backlog_dir().parent)
+    if undone:
+        print_skill()
+    sys.exit(rc)
+
+# shortcut: task edit's value-less options, the same on every tested release (every other option takes a value); recheck when adding one
+TASK_EDIT_SWITCHES = {"--clear-due-date", "--clear-milestone", "--plain", "--clear-labels", "--clear-ac",
+                      "--clear-final-summary", "--clear-deps", "--clear-refs", "--clear-docs", "-h", "--help"}
+DEP_FLAGS = ("--add-dep", "--remove-dep", "--dep", "--depends-on")
+
+
+def usage_error(msg):
+    print(f"backlog-extras: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def split_task_edit(argv):
+    """Return (task ids, other args without --add-dep/--remove-dep, {dep flag: comma-split values}, flags seen)."""
+    ids, rest, deps, seen = [], [], {f: [] for f in DEP_FLAGS}, set()
+    i = 0
+    while i < len(argv):
+        t, i = argv[i], i + 1
+        if not t.startswith("-") or t == "-":
+            ids.append(t)
+            continue
+        flag, eq, value = t.partition("=") if t.startswith("--") else (t[:2], len(t) > 2, t[2:])
+        taken = [t]
+        seen.add(flag)
+        if not eq and t not in TASK_EDIT_SWITCHES:
+            if i < len(argv):
+                value, i = argv[i], i + 1
+                taken.append(value)
+            elif flag in ("--add-dep", "--remove-dep"):
+                usage_error(f"task edit {t} needs a value")
+        if flag in deps:
+            deps[flag] += [v.strip() for v in value.split(",") if v.strip()]
+        if flag not in ("--add-dep", "--remove-dep"):
+            rest += taken
+    return ids, rest, deps, seen
+
+
+def current_deps(task_id):
+    r = subprocess.run([real_backlog(), "task", "view", task_id, "--json"], capture_output=True, text=True,
+                       stdin=subprocess.DEVNULL)
+    return json.loads(r.stdout)["task"]["dependencies"] if r.returncode == 0 else None
+
+
+def warn_dropped(ids, new):
+    keep = {norm(d) for d in new}
+    for task_id in ids:
+        dropped = [d for d in current_deps(task_id) or [] if norm(d) not in keep]
+        if dropped:
+            print(f"backlog-extras: --dep replaces dependencies; {task_id} drops {', '.join(dropped)}"
+                  " (use --add-dep to add)", file=sys.stderr)
+
+
+def task_edit(argv):
+    if not any(t.partition("=")[0] in DEP_FLAGS for t in argv):  # no dependency flag: plain upstream
+        os.execv(real_backlog(), ["backlog", "task", "edit", *argv])
+    ids, others, deps, seen = split_task_edit(argv)
+    add, remove = deps["--add-dep"], deps["--remove-dep"]
+    set_flags = [f for f in ("--dep", "--depends-on", "--clear-deps") if f in seen]
+    if not seen & {"--add-dep", "--remove-dep"}:
+        # upstream's --dep replaces the list; warn, but only on a tested release, where the JSON shape is known
+        if seen & {"--dep", "--depends-on"} and found_version() in BACKLOG_TESTED:
+            warn_dropped(ids, deps["--dep"] + deps["--depends-on"])
+        os.execv(real_backlog(), ["backlog", "task", "edit", *argv])
+    if set_flags:
+        usage_error(f"--add-dep/--remove-dep cannot combine with {', '.join(set_flags)}")
+    if not ids:
+        usage_error("task edit --add-dep/--remove-dep needs a task id")
+    require_pinned_backlog()
+    backlog_dir()  # the merge is an added command: refuse an unsupported layout before upstream edits anything
+    rc = 0
+    for task_id in ids:  # each task gets its own merged list
+        cur = current_deps(task_id)
+        if cur is None:
+            sys.exit(f"backlog-extras: no task {task_id}")
+        gone = {norm(d) for d in remove}
+        merged = [d for d in cur if norm(d) not in gone]
+        for d in add:
+            if norm(d) not in {norm(m) for m in merged}:
+                merged.append(d)
+        dep = ["--dep", ",".join(merged)] if merged else ["--clear-deps"]
+        rc = subprocess.call([real_backlog(), "task", "edit", task_id, *others, *dep]) or rc
+    sys.exit(rc)
+
+
+# The one hand-written list of added commands: dispatch, the version gate, help, the session doctor,
+# the guard's deny message and scripts/check_commands.py (against README) all derive from it.
+# (usage after `backlog `, summary, handler, True when it extends a command upstream also has)
+COMMANDS = [
+    ("decision view <id>", "print one decision file", decision_view, False),
+    ("decision update <id> [--content MD] [--status S]", "replace a decision's body and/or status", decision_update, False),
+    ("decision remove <id>", "delete a live decision, releasing its ID", decision_remove, False),
+    ("milestone view <id or title>", "print one milestone file", milestone_view, False),
+    ("milestone update <id or title> --description MD", "replace a milestone's description", milestone_update, False),
+    ("doc remove <id>", "delete a live doc, releasing its ID", doc_remove, False),
+    ("doctor [--fix --yes]", "stock doctor, then archived draft IDs reused by live drafts and leftover upstream instruction blocks", doctor, True),
+    ("task edit <id> --add-dep X[,Y]", "add dependencies, keeping the current ones", task_edit, True),
+    ("task edit <id> --remove-dep X[,Y]", "remove only these dependencies", task_edit, True),
+]
+ALIASES = {"tasks": "task", "milestones": "milestone"}  # upstream's command aliases
+# upstream commands the wrapper corrects (doc-1 section 4); not COMMANDS rows, since they add nothing to help
+CORRECTIONS = {"init": init, "agents": agents, "config": config}
+
+
+def words(usage_or_argv):
+    """Leading command words: tokens before the first <, [ or - (alias folded)."""
+    out = []
+    for t in usage_or_argv:
+        if t[:1] in "<[-":
+            break
+        out.append(ALIASES.get(t, t) if not out else t)
+    return out
+
+
+ROWS = [(words(u.split()), u, s, h, ext) for u, s, h, ext in COMMANDS]
+
+
+def prefix(a, b):
+    return a[:len(b)] == b or b[:len(a)] == a
+
+
+def help_scope(argv):
+    """Command words a help request is about, or None when argv is not one."""
+    # shortcut: a literal -h/--help option value (`--notes -h`) also counts as a help request; upgrade by parsing options if that bites
+    if argv[:1] == ["help"]:
+        return words(argv[1:])
+    if "--help" in argv or "-h" in argv:
+        return words(argv)
+    return None
+
+
+def show_help(argv, scope):
+    for w, _, _, handler, ext in ROWS:
+        if not ext and scope[:len(w)] == w:
+            # the real args, so argparse prints help for a real -h and exits 2 for `--content -h`
+            return handler(["--help"] if argv[:1] == ["help"] else argv[len(w):])
+    rows = [(u, s) for w, u, s, _, _ in ROWS if prefix(w, scope)]
+    if not rows:
+        os.execv(real_backlog(), ["backlog", *argv])
+    rc = subprocess.call([real_backlog(), *argv])
+    width = max(len(u) for u, _ in rows) + 2
+    print("\nAdded by backlog-extras:")
+    for u, s in rows:
+        print(f"  {u:<{width}}{s}")
+    sys.exit(rc)
+
+
+def main(argv):
+    if argv == ["--backlog-extras-commands"]:  # hidden: the hooks build their command lists from it
+        return print("\n".join(f"{u}\t{s}" for u, s, _, _ in COMMANDS))
+    # upstream prints its version for -v/--version anywhere in argv, so it answers these unchanged
+    # shortcut: a literal -v option value to an added command (`--notes -v`) is a version request too; upgrade by parsing options if that bites
+    if "-v" in argv or "--version" in argv:
+        os.execv(real_backlog(), ["backlog", *argv])
+    scope = help_scope(argv)
+    if scope is not None:
+        return show_help(argv, scope)
+    for w, _, _, handler, ext in ROWS:
+        if words(argv)[:len(w)] == w:
+            if not ext:  # extended commands gate themselves: parts of them are upstream's and stay ungated
+                require_pinned_backlog()
+            return handler(argv[len(w):])
+    if argv[:1] and argv[0] in CORRECTIONS:
+        return CORRECTIONS[argv[0]](argv[1:])
+    os.execv(real_backlog(), ["backlog", *argv])
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
