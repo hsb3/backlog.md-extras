@@ -36,7 +36,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, subprocess
-          pins = json.load(open('plugins/backlog-extras/requirements.json'))['pins']
+          pins = json.load(open('requirements.json'))['pins']
           subprocess.run(['npm', 'install', '-g', 'backlog.md@' + pins['backlog.md'],
                           '@openai/codex@' + pins['codex'],
                           '@anthropic-ai/claude-code@' + pins['claude'],
