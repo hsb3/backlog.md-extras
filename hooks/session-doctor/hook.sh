@@ -31,13 +31,6 @@ release=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["plugi
 install="gh api -H 'Accept: application/vnd.github.raw' 'repos/hsb3/backlog.md-extras/contents/install.sh?ref=v$release' | sh"
 warn=()
 
-added() { # added <prefix> <cli>: the wrapper's command table as "`<prefix><usage>` (summary); ...", so this list never drifts from it
-  local list
-  list=$("$wrapper" --backlog-extras-commands 2>/dev/null | awk -F'\t' -v cli="$1" '{printf "%s`%s%s` (%s)", (NR > 1 ? "; " : ""), cli, $1, $2}' || true)
-  # a failed wrapper call leaves the list empty; point at help instead of naming nothing
-  printf '%s' "${list:-the commands \`$2 --help\` lists}"
-}
-
 cli=backlog
 if [[ "${BACKLOG_EXTRAS_HARNESS:-}" == codex ]]; then
   # Codex neither puts plugin bin/ on PATH nor gives hooks an env file, so the agent calls the wrapper by its full path
@@ -47,7 +40,7 @@ elif [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
   # shellcheck disable=SC2016 # $PATH must expand when the env file is sourced, not now
   printf 'export PATH="%s:$PATH"\n' "$plugin/bin" >>"$CLAUDE_ENV_FILE"
 else
-  warn+=("backlog-extras: Claude Code gave the hook no CLAUDE_ENV_FILE, so \`backlog\` is npm's and the added commands are missing this session. Run them as \`$wrapper <command>\`: $(added "" "$wrapper").")
+  warn+=("backlog-extras: Claude Code gave the hook no CLAUDE_ENV_FILE, so \`backlog\` is npm's and the added commands are missing this session. Run every Backlog.md command as \`$wrapper\` instead.")
 fi
 
 # the wrapper skips itself on PATH, so this reports the real backlog's version, or fails when there is none
@@ -56,7 +49,7 @@ if [[ -z "$found" || ", $tested, " != *", $found, "* ]]; then
   warn+=("backlog-extras: Backlog.md ${found:-not installed} found, the wrapper is tested against $tested (installs $pin); its added commands refuse to run until fixed. Fix: in a terminal run \`$install\`, or to add a release follow the \"Upgrade Backlog.md\" runbook in the backlog.md-extras spec.")
 fi
 
-guide="This project is managed with Backlog.md through its CLI; load the \`backlog-md\` skill (listed as \`backlog-extras:backlog-md\`) before any Backlog.md work; it is the complete workflow. Run it as \`$cli\`, the backlog-extras wrapper: it passes every command to Backlog.md and adds or extends: $(added "$cli " "$cli"). \`$cli --help\` lists them after upstream's help. Direct writes under the backlog folder are blocked by the backlog-guard hook. Run \`$cli doctor\` after \`$cli draft create\` or \`$cli task demote\` in a project with archived drafts, because their IDs get reused."
+guide="This project is managed with Backlog.md through its CLI; load the \`backlog-md\` skill (listed as \`backlog-extras:backlog-md\`) before any Backlog.md work; it is the complete workflow. Run it as \`$cli\`, the backlog-extras wrapper, for every Backlog.md command. Direct writes under the backlog folder are blocked by the backlog-guard hook."
 
 if ((${#warn[@]})); then
   msg=$(printf '%s\n' "${warn[@]}")

@@ -46,12 +46,6 @@ check() { # check <name> <0 if the assertions held>
   if [[ "$2" == 0 && "$rc" == 0 ]]; then echo "ok   $1"; else echo "FAIL $1 (rc=$rc) out: $out env: $(cat "$envf")"; fail=1; fi
 }
 has() { jq -e --arg s "$2" "$1 // \"\" | contains(\$s)" <<<"${out:-null}" >/dev/null 2>&1; }
-USAGES=$(PATH="$BASE" "$PLUGIN_BIN/backlog" --backlog-extras-commands | cut -f1)
-[[ -n "$USAGES" ]] || { echo "FAIL wrapper printed no command table"; exit 1; }
-lists_all() { # lists_all <jq path>: names every usage in the wrapper's command table
-  local u
-  while IFS= read -r u; do has "$1" "$u" || return 1; done <<<"$USAGES"
-}
 skill() { has .hookSpecificOutput.additionalContext "load the \`backlog-md\` skill" && has .hookSpecificOutput.additionalContext "before any Backlog.md work"; }
 nosys() { jq -e 'has("systemMessage") | not' <<<"${out:-null}" >/dev/null 2>&1; }
 prepends() { # sourcing the env file puts the plugin's bin/ first
@@ -74,22 +68,22 @@ r=1; has .systemMessage 9.9.9 && has .systemMessage "$PIN" && has .systemMessage
 check "wrong version: warns with both versions, still prepends" "$r"
 
 hook "$T/pinned" "$T/proj" "$T/proj"
-r=1; nosys && prepends && has .hookSpecificOutput.additionalContext "backlog decision" &&
-  ! has .hookSpecificOutput.additionalContext "bl " && lists_all .hookSpecificOutput.additionalContext && skill &&
+r=1; nosys && prepends && has .hookSpecificOutput.additionalContext "Run it as \`backlog\`" &&
+  ! has .hookSpecificOutput.additionalContext "bl " && ! has .hookSpecificOutput.additionalContext "decision view" && skill &&
   [[ "$(jq -r .hookSpecificOutput.hookEventName <<<"$out")" == SessionStart ]] && r=0
-check "pinned: prepends plugin bin/, guidance names backlog only, every added command and the skill" "$r"
+check "pinned: prepends plugin bin/, guidance names backlog and the skill, leaves the commands to the skill" "$r"
 
 hook "$T/oldest" "$T/proj" "$T/proj"
 r=1; nosys && prepends && r=0
 check "tested release other than the pin: no warning" "$r"
 
 hook "$T/pinned" "$T/proj" "$T/proj" noenv
-r=1; has .systemMessage CLAUDE_ENV_FILE && has .hookSpecificOutput.additionalContext CLAUDE_ENV_FILE && lists_all .systemMessage && r=0
-check "no CLAUDE_ENV_FILE: warns loudly, naming every added command" "$r"
+r=1; has .systemMessage CLAUDE_ENV_FILE && has .hookSpecificOutput.additionalContext CLAUDE_ENV_FILE && has .systemMessage "as \`$PLUGIN_BIN/backlog\` instead" && r=0
+check "no CLAUDE_ENV_FILE: warns loudly, naming the wrapper path" "$r"
 
 hook "$T/pinned" "" "$T/proj" codex
 r=1; nosys && has .hookSpecificOutput.additionalContext "Run it as \`$PLUGIN_BIN/backlog\`" &&
-  has .hookSpecificOutput.additionalContext "\`$PLUGIN_BIN/backlog doctor\`" && skill && r=0
+  skill && r=0
 check "codex: no env file needed, guidance names the wrapper path and the skill" "$r"
 
 mkdir -p "$T/proj/sub/deep"
