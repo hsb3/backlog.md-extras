@@ -3,10 +3,10 @@
 # and the backlog-md skill beside it in ../share/backlog-extras/SKILL.md, which bl prints from init and agents --update-instructions.
 # Claude Code sessions get the wrapper (as backlog) and the hooks from the backlog-extras plugin instead. Rerun after a pin bump to upgrade.
 # From a checkout: ./install.sh. Without one:
-#   gh api -H 'Accept: application/vnd.github.raw' 'repos/hsb3/backlog.md-extras/contents/install.sh?ref=v0.7.1' | sh
+#   gh api -H 'Accept: application/vnd.github.raw' 'repos/hsb3/backlog.md-extras/contents/install.sh?ref=v0.7.2' | sh
 set -eu
 unset CDPATH  # an exported CDPATH makes cd echo, corrupting $(cd ... && pwd)
-release=0.7.1
+release=0.7.2
 ref=${BACKLOG_EXTRAS_REF:-v$release}
 case "$ref" in '' | -* | *[!a-zA-Z0-9._/-]*) echo 'install.sh: BACKLOG_EXTRAS_REF must be a tag, branch or commit without URL query characters' >&2; exit 1 ;; esac
 command -v python3 >/dev/null || { echo 'install.sh: python3 is required; see requirements.json' >&2; exit 1; }
