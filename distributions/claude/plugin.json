@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "backlog-extras",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "CLI-only Backlog.md for agents: a backlog wrapper that adds the operations Backlog.md lacks, a guard against direct writes to the backlog folder, and a session check of the Backlog.md release.",
   "author": {
     "name": "Henry S. Burden III"
