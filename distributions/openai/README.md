@@ -19,7 +19,7 @@ Full design, gate and runbooks: the [spec](https://github.com/hsb3/backlog.md-ex
 
 ## Requirements
 
-[requirements.json](requirements.json) is the machine-readable source for release identity, exact compatibility pins, dependency minimums, supported platforms and CI action references. The gate rejects drift in the manifests, wrapper, installer and workflow.
+[requirements.json](requirements.json) is the machine-readable source for release identity, exact compatibility pins, dependency minimums and supported platforms; CI actions are pinned to full commit SHAs, which Dependabot updates. The gate rejects drift in the manifests, wrapper, installer and workflow.
 
 | Use | Required |
 |---|---|
@@ -114,6 +114,8 @@ Plain `--dep` and `--depends-on` still replace the list as upstream does, and on
 - `backlog agents --update-instructions`: prints the skill text instead of writing the block; upstream is not run.
 - `backlog config` (the wizard, no subcommand): its last question installs the Claude Code agent; the wrapper removes it again and prints the skill text.
 
+While `.backlog/config.yml` does not parse, every command except help, version and `doctor` exits 1 naming the line, since upstream would read the file as empty settings and its next write would drop them all.
+
 Projects that already carry the block need it removed by hand; `backlog doctor` names the files. The added and corrected commands refuse to run unless `backlog --version` is a release in `BACKLOG_TESTED` in the wrapper, because they edit Backlog.md's files directly. If no eligible `backlog` executable is found, the wrapper exits 127.
 
 ## Learn more
@@ -124,7 +126,7 @@ Projects that already carry the block need it removed by hand; `backlog doctor` 
 
 ## Limits
 
-- The guard's Bash check matches patterns rather than parsing shell; obfuscated writes get through and some harmless commands are denied. It ignores `.backlog` in heredoc bodies, in quoted prose and as a `cp`/`rsync` source; interpreters and nested shells (`python3`, `node`, `bash -c`, `eval` and the like) are denied whenever the command names `.backlog`. On a case-insensitive disk (the macOS default) `.BACKLOG/` counts as the board too.
+- The guard's Bash check matches patterns rather than parsing shell; obfuscated writes get through and some harmless commands are denied. It ignores `.backlog` in heredoc bodies, in quoted prose and as a `cp`/`rsync` source; checks run per statement (`;`, `&&`, `||`, newlines; a pipeline counts as one), unless a `cd` into the board or a variable holding a board path makes it check the whole command. Interpreters and nested shells (`python3`, `node`, `bash -c`, `eval` and the like) are denied when their statement, or a heredoc they read, names `.backlog`. On a case-insensitive disk (the macOS default) `.BACKLOG/` counts as the board too.
 - The bypass covers one Bash command: an empty reason is denied, the hook never reads the variable from its environment (exporting it does nothing), and each use is appended as a JSON line to `${XDG_STATE_HOME:-~/.local/state}/backlog-extras/bypass.log`; if that write fails, the command is denied.
 - Codex: plain `backlog` stays npm's; the added commands work only through the wrapper's full path, which the session doctor gives the agent.
 - Codex 0.163.0 does not expose a shell call's `workdir` to hooks. A relative write executed inside `.backlog/` without naming that folder in the command can escape this guard. MCP file editors are outside the current matcher, and later input sent through `write_stdin` is not checked again. This is a local editing guardrail, not a filesystem security boundary.

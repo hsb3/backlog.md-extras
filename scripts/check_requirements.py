@@ -33,9 +33,11 @@ installer = (root / "install.sh").read_text()
 if f'release={r["pluginVersion"]}\n' not in installer:
     errors.append("installer release differs from requirements.json")
 workflow = (root / ".github/workflows/tests.yml").read_text()
-uses = set(re.findall(r"^\s*- uses:\s*(\S+)", workflow, re.M))
-if uses != {f"{action}@{ref}" for action, ref in r["actions"].items()}:
-    errors.append("CI action references must exactly match requirements.json")
+# Dependabot keeps action versions current; the gate only demands that each is pinned to a full commit SHA
+for wf in sorted((root / ".github/workflows").glob("*.yml")):
+    for use in re.findall(r"^\s*-?\s*uses:\s*(\S+)", wf.read_text(), re.M):
+        if not re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", use):
+            errors.append(f"{wf.name}: action {use} is not pinned to a full commit SHA")
 for tool in ("node", "python"):
     if f"{tool}-version: '{r['ci'][tool]}'" not in workflow:
         errors.append(f"CI {tool} version differs from requirements.json")

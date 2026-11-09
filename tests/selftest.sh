@@ -350,6 +350,18 @@ if [[ "$rc" == 1 && "$out" == *AGENTS.md* && "$out" == *.github/copilot-instruct
 rm AGENTS.md .github/copilot-instructions.md
 set +e; "$BL" doctor </dev/null >/dev/null 2>&1; rc=$?; set -e
 if [[ "$rc" == 0 ]]; then echo "ok   doctor without blocks exits 0"; else echo "FAIL doctor without blocks (rc=$rc)"; fail=1; fi
+# GitHub #3: a config.yml that does not parse is refused before upstream reads it as empty settings and rewrites it
+cp .backlog/config.yml config.good
+printf '%s\n' 'definition_of_done: ["make check passes"]' "  - 'orphan item'" >>.backlog/config.yml
+cp .backlog/config.yml config.bad
+set +e; err=$("$BL" config set remoteOperations false </dev/null 2>&1); rc=$?; set -e
+if [[ "$rc" == 1 && "$err" == *"does not parse (line "* ]] && cmp -s .backlog/config.yml config.bad; then
+  echo "ok   malformed config: config set refused, file unchanged"; else echo "FAIL malformed config set (rc=$rc): $err"; fail=1; fi
+set +e; out=$("$BL" doctor </dev/null 2>&1); rc=$?; set -e
+if [[ "$rc" == 1 && "$out" == *"config.yml does not parse (line "*"indented line"* ]]; then
+  echo "ok   doctor names the malformed config line"; else echo "FAIL doctor malformed config (rc=$rc): $out"; fail=1; fi
+cp config.good .backlog/config.yml
+if "$BL" config get projectName </dev/null >/dev/null 2>&1; then echo "ok   repaired config runs again"; else echo "FAIL repaired config"; fail=1; fi
 cd "$D"
 
 # version gate: extension commands refuse an untested backlog; passthrough does not

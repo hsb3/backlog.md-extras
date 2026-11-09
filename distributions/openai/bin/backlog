@@ -93,6 +93,62 @@ def backlog_dir():
     return find_backlog_dir() or sys.exit(f"backlog-extras: this project keeps its Backlog.md config in {c}; backlog-extras supports only {LAYOUT}")
 
 
+def balanced(v):
+    """True when every quote and bracket in a one-line YAML value closes."""
+    stack, quote, i = [], "", 0
+    while i < len(v):
+        c = v[i]
+        if quote:
+            if c == "\\" and quote == '"':
+                i += 1
+            elif c == quote:
+                quote = ""
+        elif c in "\"'":
+            quote = c
+        elif c in "[{":
+            stack.append("]" if c == "[" else "}")
+        elif c in "]}":
+            if not stack or stack.pop() != c:
+                return False
+        elif c == "#" and not stack:
+            break  # a comment; earlier text closed
+        i += 1
+    return not stack and not quote
+
+
+def config_problem(cfg):
+    """The first line of a config that Backlog.md would fail to parse, as "line N: why", or None.
+
+    Backlog.md reads a config that does not parse as empty settings, and its next write rewrites the file from them.
+    shortcut: checks the flat shape Backlog.md writes (top-level `key: value`, block items under a key with no value,
+    one-line flow values), not full YAML; upgrade to a YAML parser if real configs use more.
+    """
+    nested = False
+    for n, line in enumerate(cfg.read_text(errors="replace").splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0] in " \t" or line == "-" or line.startswith("- "):  # YAML allows a key's list items at its own indent
+            if not nested:
+                return f"line {n}: indented line under a key that already has a value"
+            continue
+        m = re.match(r"[A-Za-z_][\w-]*:(?:\s+(.*))?$", line)
+        if not m:
+            return f"line {n}: not a `key: value` line"
+        v = (m.group(1) or "").strip()
+        nested = v == "" or v.startswith("#")
+        if not nested and not balanced(v):
+            return f"line {n}: unclosed quote or bracket"
+    return None
+
+
+def refuse_bad_config():
+    root = find_backlog_dir()
+    p = root and config_problem(root / "config.yml")
+    if p:
+        sys.exit(f"backlog-extras: .backlog/config.yml does not parse ({p}). Backlog.md would read it as empty settings"
+                 " and its next write would drop them, so nothing ran. Repair the file by hand (ask the user), then retry.")
+
+
 def find(kind, key):
     folder = backlog_dir() / kind
     key = key.lower()
@@ -221,7 +277,10 @@ def doctor(argv):
     for f in blocks:
         print(f"\nUpstream Backlog.md instruction block in {f}: remove the block by hand;"
               " the backlog-md skill replaces it (`backlog agents --update-instructions` prints it).")
-    sys.exit(rc or int(bool(reused or blocks)))
+    bad = config_problem(root / "config.yml")
+    if bad:
+        print(f"\n.backlog/config.yml does not parse ({bad}): Backlog.md reads it as empty settings. Repair it by hand.")
+    sys.exit(rc or int(bool(reused or blocks or bad)))
 
 
 # where upstream writes its agent instructions (init, agents --update-instructions) and the Claude agent (init, config)
@@ -478,6 +537,8 @@ def main(argv):
     scope = help_scope(argv)
     if scope is not None:
         return show_help(argv, scope)
+    if words(argv)[:1] != ["doctor"]:  # doctor reports the problem instead
+        refuse_bad_config()
     for w, _, _, handler, ext in ROWS:
         if words(argv)[:len(w)] == w:
             if not ext:  # extended commands gate themselves: parts of them are upstream's and stay ungated

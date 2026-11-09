@@ -46,6 +46,17 @@ run allow Bash command 'git diff .backlog/'
 run allow Bash command 'rm -f /tmp/scratch.md'
 run allow Bash command "sed -n '1,5p' .backlog/config.yml"
 run allow Bash command "sed -n '/Accept/,/Def/p' '.backlog/tasks/task-1 - Write-findings.md'"
+# issue #2: a write verb or interpreter in one statement does not block a read of the board in another
+run allow Bash command 'rm -rf /tmp/scratch && git add .backlog'
+run allow Bash command 'python3 build.py && git status -- .backlog'
+run allow Bash command 'grep -c x .backlog/config.yml; bash scripts/test.sh'
+run deny  Bash command 'git status && rm .backlog/tasks/x.md'
+run deny  Bash command 'ls .backlog/tasks | xargs rm'
+run deny  Bash command 'cd .backlog && rm tasks/x.md'
+run deny  Bash command '(cd .backlog/tasks; touch x.md)'
+# shellcheck disable=SC2016 # the command text holds a literal $d
+run deny  Bash command 'd=.backlog/tasks; rm -rf "$d"'
+run deny  Bash command 'cd .backlog && python3 fix.py'
 run allow Bash command 'sed -n 1p .backlog/config.yml --posix'
 run deny  Bash command "sed --in-place 's/a/b/' .backlog/tasks/t.md"
 run deny  Bash command "perl -pi -e 's/a/b/' .backlog/tasks/t.md"

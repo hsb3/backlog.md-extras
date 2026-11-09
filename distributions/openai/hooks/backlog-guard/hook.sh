@@ -96,36 +96,59 @@ case "$tool" in
       str=${rest%%"$q"*} rest=${rest#*"$q"}
       if [[ "$q" == '"' && ( "$str" == *"\$("* || "$str" == *"\`"* ) ]]; then rest=$str$rest
       elif [[ "$str" =~ $path ]]; then masked+=${str//[[:space:]]/_}
+      # prose naming the board keeps a marker, so an interpreter running it (`bash -c "rm .backlog/x"`) is still caught
+      elif [[ "$str" == *.backlog* ]]; then masked+=_.backlog_
       else masked+=_; fi
     done
     masked+=$rest
+    # Checks run per statement (split on ; && || & and newlines), so a write verb or interpreter aimed elsewhere does not block a
+    # read of the board in another statement. A pipeline stays one statement, so `ls .backlog | xargs rm` is still caught.
+    stmts() { local s=${1//||/$'\n'}; s=${s//&&/$'\n'}; s=${s//;/$'\n'}; printf '%s\n' "${s//&/$'\n'}"; }
+    # a cd/pushd into the board or a variable holding a board path carries it into later statements: check the command as a whole
+    whole=''
+    # shellcheck disable=SC2016 # a literal backtick in the pattern
+    scope='(^|[[:space:](`])(cd|pushd)[[:space:]][^;&|]*\.backlog|(^|[[:space:](`])[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*\.backlog'
+    [[ "$masked" =~ $scope ]] && whole=1
+    # a heredoc body names the board when the command has more board mentions than its text without bodies
+    body=''
+    [[ $(grep -oi '\.backlog' <<<"$cmd" | wc -l) -gt $(grep -oi '\.backlog' <<<"$text" | wc -l) ]] && body=1
     # an interpreter or nested shell may write anywhere its text names; quoting would otherwise hide `bash -c "rm .backlog/x"`
     interp='(^|[;&|(`[:space:]])(python3?|node|ruby|bun|deno|sh|bash|zsh|eval)([[:space:]]|$)'
-    [[ "$masked" =~ $interp ]] && deny
+    while IFS= read -r st; do
+      [[ "$st" =~ $interp ]] || continue
+      [[ -n "$whole" || "$st" == *.backlog* || ( -n "$body" && "$st" == *'<<'* ) ]] && deny
+    done < <(stmts "$masked")
     # a cp/rsync writes only its destination, the last word that is not an option, unless -t (alone or in a cluster like -vt) names the target first
-    # redirections (none names the board, checked above) go first, so their & does not split a segment and their target is not a destination
+    # redirections (none names the board, checked above) go first, so their & does not split a statement and their target is not a destination
     plain=$(sed -E 's/[0-9]*(&>>?|>>?&?)[[:space:]]*[^[:space:];&|]*/ /g' <<<"$masked")
-    final=''
-    while IFS= read -r seg; do
-      read -ra w <<<"${seg%%[[:space:]]#*}" # a trailing comment holds no operand
-      if [[ "${w[0]:-}" == cp || "${w[0]:-}" == rsync ]]; then
-        dest='' whole=''
-        for x in "${w[@]:1}"; do
-          # cp's -t names the target; rsync's -t keeps times
-          case $x in --target-directory* | -t* | -[!-]*t*) [[ "${w[0]}" == rsync ]] || whole=1 ;; -*) ;; *) dest=$x ;; esac
-        done
-        [[ -n "$whole" ]] || seg="${w[0]} $dest"
-      fi
-      final+=$seg$'\n'
-    done <<<"${plain//[;&|]/$'\n'}"
-    [[ "$final" != *.backlog* ]] && exit 0
+    reduce() { # reduce <statement>: each cp/rsync in its pipeline keeps only its destination
+      local seg out='' parts x dest whole_cp
+      IFS='|' read -ra parts <<<"$1"
+      for seg in ${parts[@]+"${parts[@]}"}; do
+        read -ra w <<<"${seg%%[[:space:]]#*}" # a trailing comment holds no operand
+        if [[ "${w[0]:-}" == cp || "${w[0]:-}" == rsync ]]; then
+          dest='' whole_cp=''
+          for x in "${w[@]:1}"; do
+            # cp's -t names the target; rsync's -t keeps times
+            case $x in --target-directory* | -t* | -[!-]*t*) [[ "${w[0]}" == rsync ]] || whole_cp=1 ;; -*) ;; *) dest=$x ;; esac
+          done
+          [[ -n "$whole_cp" ]] || seg="${w[0]} $dest"
+        fi
+        out+="$seg | "
+      done
+      printf '%s' "$out"
+    }
     verbs='(^|[;&|(`[:space:]])(rm|rmdir|mv|cp|rsync|tee|touch|truncate|ln|dd|install|mkdir|chmod)([[:space:]]|$)'
     # -i only as a short-flag cluster after whitespace, so slugs like Write-findings don't match
     inplace='(^|[;&|([:space:]])(sed|perl|gsed)[[:space:]]([^|;&]*[[:space:]])?(-[a-zA-Z]*i|--in-place)'
     gitw='git[[:space:]]+(checkout|restore|rm|mv|clean|reset|stash)'
-    if [[ "$final" =~ $verbs || "$final" =~ $inplace || "$final" =~ $gitw ]]; then
-      deny
-    fi
+    writes() { [[ "$1" == *.backlog* ]] && [[ "$1" =~ $verbs || "$1" =~ $inplace || "$1" =~ $gitw ]]; }
+    all=''
+    while IFS= read -r st; do
+      r=$(reduce "$st") all+=$r$'\n'
+      [[ -z "$whole" ]] && writes "$r" && deny
+    done < <(stmts "$plain")
+    [[ -n "$whole" ]] && writes "$all" && deny
     ;;
 esac
 exit 0

@@ -110,4 +110,5 @@ Documents: `backlog doc create "Title"`, `backlog doc view doc-1`, `backlog doc 
 ## When a command refuses
 
 - Not a tested Backlog.md release, or a project not using `.backlog/config.yml` at its root: tell the user the error; do not migrate or reinstall unasked.
+- `.backlog/config.yml does not parse`: tell the user the line it names and ask them to repair the file; do not edit it yourself.
 - Write denied under `.backlog/`: do it with the CLI. Only for a repair, migration or test on a copy that the user wants, prefix that one Bash command with `BACKLOG_GUARD_BYPASS="<reason>"`; every use is logged.
