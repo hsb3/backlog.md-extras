@@ -43,6 +43,25 @@ jobs:
           git merge-base --is-ancestor "refs/tags/$RELEASE_TAG^{commit}" origin/main
           git checkout --detach "refs/tags/$RELEASE_TAG"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '26.10.0'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.14.8'
+      # same tools as tests.yml: the gate needs every declared pin
+      - name: Install system dependencies and declared CLI pins
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq shellcheck
+          python3 - <<'PY'
+          import json, subprocess
+          pins = json.load(open('requirements.json'))['pins']
+          subprocess.run(['npm', 'install', '-g', 'backlog.md@' + pins['backlog.md'],
+                          '@openai/codex@' + pins['codex'],
+                          '@anthropic-ai/claude-code@' + pins['claude'],
+                          '@fission-ai/openspec@' + pins['openspec']], check=True)
+          PY
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - run: bin/gate
       - name: Prepare archives and notes
