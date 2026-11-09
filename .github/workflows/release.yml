@@ -43,10 +43,10 @@ jobs:
           git merge-base --is-ancestor "refs/tags/$RELEASE_TAG^{commit}" origin/main
           git checkout --detach "refs/tags/$RELEASE_TAG"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: '26.10.0'
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.14.8'
       # same tools as tests.yml: the gate needs every declared pin
@@ -62,7 +62,7 @@ jobs:
                           '@anthropic-ai/claude-code@' + pins['claude'],
                           '@fission-ai/openspec@' + pins['openspec']], check=True)
           PY
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - run: bin/gate
       - name: Prepare archives and notes
         env:
