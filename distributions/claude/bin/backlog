@@ -416,7 +416,7 @@ COMMANDS = [
     ("milestone view <id or title>", "print one milestone file", milestone_view, False),
     ("milestone update <id or title> --description MD", "replace a milestone's description", milestone_update, False),
     ("doc remove <id>", "delete a live doc, releasing its ID", doc_remove, False),
-    ("doctor [--fix --yes]", "stock doctor, then archived draft IDs reused by live drafts and leftover upstream instruction blocks", doctor, True),
+    ("doctor [--fix --yes]", "check for duplicate or reused IDs, broken dependencies and stray Backlog.md instruction blocks", doctor, True),
     ("task edit <id> --add-dep X[,Y]", "add dependencies, keeping the current ones", task_edit, True),
     ("task edit <id> --remove-dep X[,Y]", "remove only these dependencies", task_edit, True),
 ]

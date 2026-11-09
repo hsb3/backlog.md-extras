@@ -3,7 +3,7 @@ id: doc-1
 title: backlog.md-extras spec
 type: specification
 created_date: 2026-10-20 00:39
-updated_date: '2026-11-08T22:36:00Z'
+updated_date: '2026-11-09T00:45:00Z'
 ---
 Status: accepted 2026-10-18; one CLI name (decision 6) added the same day; Codex support (decision 7) added 2026-10-19; moved from `docs/spec.md` into Backlog.md as doc-1 the same day. Scope widened 2026-10-21 (decision 9). One supported layout, the guard's narrowed Bash match and its per-command bypass added the same day (decisions 14-17). Upstream: [MrLesk/Backlog.md](https://github.com/MrLesk/Backlog.md), which does not take outside changes, so every augmentation lives here as a wrapper. CLI only: no MCP server.
 
@@ -46,7 +46,7 @@ requirements.json                      release identity, Backlog.md pin and test
 bin/backlog                            the wrapper; BACKLOG_VERSION and BACKLOG_TESTED are checked against requirements.json
 bin/check-requirements                 read-only runtime/install/development prerequisite check
 bin/gate                               every check (dev only, never shipped); non-zero if any fails
-skills/backlog-md/                     SKILL.md (decision 11, at most 80 lines), agents/openai.yaml, assets/icon.svg
+skills/backlog-md/                     SKILL.md (decisions 11 and 20, at most 150 lines), agents/openai.yaml, assets/icon.svg
 hooks/prerequisites.sh                 shared fail-closed prerequisite bootstrap
 hooks/hooks.json                       registers each hook dir below for Claude Code
 hooks/codex-hooks.json                 the same for Codex: BACKLOG_EXTRAS_HARNESS=codex, ${PLUGIN_ROOT}, matcher apply_patch|Bash
@@ -148,7 +148,7 @@ Inside a `.backlog/` project:
 - The real `backlog` (found through the wrapper) missing, or its version differing from `BACKLOG_VERSION`: warn, naming both versions and the fix (`install.sh` or the upgrade runbook). The guard stays active either way.
 - Every warning goes out as a user-visible `systemMessage` and in `additionalContext`. `additionalContext` always carries the guidance: `backlog` here is the wrapper, the list of added commands (from `backlog --backlog-extras-commands`; the no-`CLAUDE_ENV_FILE` warning lists them too), "run `backlog doctor` after `draft create` or `task demote` in a project with archived drafts", and the instruction to load the `backlog-md` skill (listed as `backlog-extras:backlog-md`) before any Backlog.md work. This replaces the per-project `AGENTS.md` line.
 
-Skill (`skills/backlog-md/SKILL.md`, decision 11): the agent learns the CLI from the skill, not from upstream's `AGENTS.md` block. It says what that block says (run `backlog instructions overview` at the start of Backlog.md work, `backlog instructions task-creation`, `task-execution` and `task-finalization` before those steps, `backlog <command> --help` before an unfamiliar command, no direct edits of board files), pointing at upstream's guides rather than copying them so they follow the pin; then every added command as `backlog <usage>`, the `--add-dep` versus `--dep` distinction and the doctor-after-draft rule. Under Codex, `backlog` there means the wrapper's full path from the guidance. It reads standalone, since the wrapper prints it from `init`, `agents --update-instructions` and the config wizard (section 4). Verified live in a scratch project with isolated config: Claude Code 2.1.306 (`--plugin-dir`) and codex-cli 0.163.0 (marketplace install, isolated `CODEX_HOME`) both list it as `backlog-extras:backlog-md`, and on "List the tasks on this Backlog.md board." Claude Code invokes it through its Skill tool and Codex reads the installed `SKILL.md`, after which both run `backlog instructions overview` (Codex by the wrapper's full path).
+Skill (`skills/backlog-md/SKILL.md`, decisions 11 and 20): the agent learns the CLI from the skill alone, not from upstream's `AGENTS.md` block or `backlog instructions`. It is one self-contained guide written for the agent using the board: rules (CLI-only changes, read before writing, `--help` before unfamiliar commands, Codex full path), then finding, creating, working, finishing and archiving tasks, the other records, and what to do when a command refuses. Upstream's four guides are restated in it, and every wrapper command appears where the agent needs it, as `backlog <usage>` with the wrapper's summary. How the wrapper differs from upstream belongs in the README and this spec, not the skill. `scripts/check_upstream_guides.sh` fails when the pin's `backlog instructions overview|task-creation|task-execution|task-finalization` output differs from `tests/fixtures/upstream-instructions.md`, the snapshot the skill was last reviewed against. Under Codex, `backlog` there means the wrapper's full path from the guidance. It reads standalone, since the wrapper prints it from `init`, `agents --update-instructions` and the config wizard (section 4). Verified live in a scratch project with isolated config (pointer version of the skill): Claude Code 2.1.306 (`--plugin-dir`) and codex-cli 0.163.0 (marketplace install, isolated `CODEX_HOME`) both list it as `backlog-extras:backlog-md`, and on "List the tasks on this Backlog.md board." Claude Code invokes it through its Skill tool and Codex reads the installed `SKILL.md`.
 
 ## 7. Distribution
 
@@ -196,7 +196,7 @@ Every new check is first watched failing against the code it guards.
 ### Upgrade Backlog.md
 
 1. `npm install -g backlog.md@<new>`.
-2. Read upstream's release notes since the newest tested release, and compare `backlog task edit --help` with the wrapper's `TASK_EDIT_SWITCHES`.
+2. Read upstream's release notes since the newest tested release, and compare `backlog task edit --help` with the wrapper's `TASK_EDIT_SWITCHES`. When changing the pin, `sh scripts/check_upstream_guides.sh` shows how upstream's workflow guides changed: update the skill to match, then rerun it with `--update`.
 3. Append `<new>` to `tested.backlog.md` in requirements.json and to its derived `BACKLOG_TESTED` in bin/backlog; to make it the installed release, also set `pins.backlog.md` and `BACKLOG_VERSION`. Host pins and dependency requirements live in that same declaration. Drop a release from the list only when the wrapper stops supporting it.
 4. `bin/gate`. On failure, fix the wrapper or revert: `npm install -g backlog.md@<old>` and leave the lists.
 5. Cut a release (below).
@@ -245,6 +245,7 @@ Work on this repo is tracked with Backlog.md in `.backlog/`, managed through the
 | 17 | Per-command guard bypass (2026-10-21, TASK-27, owner decision) | `BACKLOG_GUARD_BYPASS="<reason>" <cmd>`, Bash only: a reason is required and logged with time, project and command, and it is never a session-wide switch |
 | 18 | Tested releases instead of one pin (2026-11-08) | The added and corrected commands accept any Backlog.md release in requirements.json `tested` (1.54.0 to 1.55.3); `install.sh` and CI install the one in `pins`. Not a semver range: patch releases change behaviour (1.55.2 broke Git HTTPS proxies, 1.55.3 fixed task reads and writes) and the wrapper edits board files, so every accepted release must pass the self-test. 1.53.0 is excluded: it reuses archived task IDs |
 | 19 | plugin-factory layout (2026-11-08, owner decision) | The plugin sits at the repo root, ported from the owner's plugin-factory template: canonical `plugin.json`, generated `distributions/claude` and `distributions/openai` that the marketplaces install, OpenSpec design with eval-mapped scenarios, attested draft releases, MIT license. The template refuses hooks; here the packer ships exactly the wrapper, both hooks and `requirements.json`, and fails when a hook command names an unbundled script. The Codex runtime carries no portable `plugin.json`, because Codex 0.163.0 reads it in place of `.codex-plugin/plugin.json`, the only manifest declaring the hooks. Marketplace name stays `backlog-md-extras` so install commands do not change |
+| 20 | Self-contained skill (2026-11-08, owner decision) | The skill restates upstream's workflow guides instead of pointing at `backlog instructions`, and speaks only to the agent using the board; wrapper-versus-upstream detail lives in the README and this spec. One read gives the agent the whole workflow with the wrapper's commands in place, and upstream's guides (which name a `backlog/` folder and teach `--dep` as the way to add dependencies) no longer conflict with it. Cost: the text no longer follows the pin by itself, so the gate snapshots the pin's guides and fails when they change. Amends decision 11 |
 
 
 

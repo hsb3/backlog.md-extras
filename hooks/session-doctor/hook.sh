@@ -56,7 +56,7 @@ if [[ -z "$found" || ", $tested, " != *", $found, "* ]]; then
   warn+=("backlog-extras: Backlog.md ${found:-not installed} found, the wrapper is tested against $tested (installs $pin); its added commands refuse to run until fixed. Fix: in a terminal run \`$install\`, or to add a release follow the \"Upgrade Backlog.md\" runbook in the backlog.md-extras spec.")
 fi
 
-guide="This project is managed with Backlog.md through its CLI; load the \`backlog-md\` skill (listed as \`backlog-extras:backlog-md\`) before any Backlog.md work, for upstream's workflow guides and these rules. Run it as \`$cli\`, the backlog-extras wrapper: it passes every command to Backlog.md and adds or extends: $(added "$cli " "$cli"). \`$cli --help\` lists them after upstream's help. Direct writes under the backlog folder are blocked by the backlog-guard hook. Run \`$cli doctor\` after \`$cli draft create\` or \`$cli task demote\` in a project with archived drafts, because their IDs get reused."
+guide="This project is managed with Backlog.md through its CLI; load the \`backlog-md\` skill (listed as \`backlog-extras:backlog-md\`) before any Backlog.md work; it is the complete workflow. Run it as \`$cli\`, the backlog-extras wrapper: it passes every command to Backlog.md and adds or extends: $(added "$cli " "$cli"). \`$cli --help\` lists them after upstream's help. Direct writes under the backlog folder are blocked by the backlog-guard hook. Run \`$cli doctor\` after \`$cli draft create\` or \`$cli task demote\` in a project with archived drafts, because their IDs get reused."
 
 if ((${#warn[@]})); then
   msg=$(printf '%s\n' "${warn[@]}")

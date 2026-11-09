@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SKILL_MAX_LINES = 80
+SKILL_MAX_LINES = 150
 
 
 def table_commands(text, heading):
@@ -54,9 +54,9 @@ def mentions(path, rows):
     bad = [(c, s) for c, s in rows if f"- `{c}`: {s}." not in lines]
     for c, s in bad:
         print(f"FAIL {path} omits `{c}` with its summary: {s}")
-    # a bullet that opens with a backticked `backlog ...` usage is a wrapper-row line; upstream commands appear only in prose
+    # a bullet of the form "- `backlog <usage>`: <summary>" is a wrapper-row line; upstream commands never take that form
     known = {c for c, _ in rows}
-    stale = [m.group(1) for m in map(re.compile(r"\s*(?:[-*+]|\d+[.)])\s+\**`(backlog [^`]*)`").match, lines) if m and m.group(1) not in known]
+    stale = [m.group(1) for m in map(re.compile(r"\s*(?:[-*+]|\d+[.)])\s+\**`(backlog [^`]*)`: ").match, lines) if m and m.group(1) not in known]
     for c in stale:
         print(f"FAIL {path} lists `{c}`, which is not in the wrapper's COMMANDS table")
     if len(lines) > SKILL_MAX_LINES:

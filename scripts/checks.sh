@@ -23,6 +23,7 @@ for t in "$p"/hooks/*/test.sh; do
 done
 step "hook layout" python3 scripts/check_hook_layout.py
 step "command tables and skill match the wrapper table" python3 scripts/check_commands.py
+step "skill reviewed against the pin's workflow guides" sh scripts/check_upstream_guides.sh
 step "installer (checkout and piped)" bash scripts/check_install.sh
 step "Codex marketplace lifecycle" python3 scripts/check_codex.py
 step "shellcheck" shellcheck install.sh bin/gate hooks/*.sh hooks/*/*.sh tests/*.sh scripts/*.sh
