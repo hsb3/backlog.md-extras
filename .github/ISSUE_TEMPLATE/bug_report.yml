@@ -41,7 +41,7 @@ body:
     attributes:
       label: backlog-extras version
       description: The `version` in the installed plugin.json.
-      placeholder: "0.7.0"
+      placeholder: "0.7.1"
     validations:
       required: true
 
