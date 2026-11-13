@@ -1,11 +1,11 @@
 ---
 id: TASK-36
 title: 'backlog-guard: interpreter denies name the cause and the temp-file remedy'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T16:35:00Z'
-updated_date: '2026-11-13T17:18:00Z'
+updated_date: '2026-11-13T17:43:00Z'
 labels:
   - guard
   - hardening
@@ -46,3 +46,9 @@ Approach changed on owner direction (2026-11-13): a content heuristic that let i
 
 Verified 2026-11-13: guard test passes (deny reason + run-by-path cases; reason test fails on HEAD hook), shellcheck PASS, pytest PASS, skill/table checks PASS. bin/gate exits 1 on both dev and clean main with identical failures from host drift: claude 2.1.323 vs pin 2.1.310, openspec 1.14.0 vs 1.14.3, and a second Backlog.md 1.55.0 under mise node/26 that the self-test and installer resolve. Not Done until gate is green on a matching host or CI.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The guard keeps denying interpreter or nested-shell source that names the board, and the deny reason now names that cause and suggests running the script from a temp file; the backlog-md skill tells agents to pass long text and scripts via temp files. A content heuristic was tried and dropped after review found 13 board writes it let through. Verified: guard tests (new reason check fails on the old hook), PR #6 Tests workflow green on ubuntu-24.04 and macos-15. Issue #4 stays open for the owner to close against this.
+<!-- SECTION:FINAL_SUMMARY:END -->
