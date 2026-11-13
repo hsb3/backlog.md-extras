@@ -116,7 +116,8 @@ case "$tool" in
     interp='(^|[;&|(`[:space:]])(python3?|node|ruby|bun|deno|sh|bash|zsh|eval)([[:space:]]|$)'
     while IFS= read -r st; do
       [[ "$st" =~ $interp ]] || continue
-      [[ -n "$whole" || "$st" == *.backlog* || ( -n "$body" && "$st" == *'<<'* ) ]] && deny
+      [[ -n "$whole" || "$st" == *.backlog* || ( -n "$body" && "$st" == *'<<'* ) ]] &&
+        deny "The board path appears in interpreter or nested-shell source, which the guard cannot tell from a write. If the script only writes elsewhere, save it to a temp file and run it by path (\`python3 \"\$f\"\`). "
     done < <(stmts "$masked")
     # a cp/rsync writes only its destination, the last word that is not an option, unless -t (alone or in a cluster like -vt) names the target first
     # redirections (none names the board, checked above) go first, so their & does not split a statement and their target is not a destination

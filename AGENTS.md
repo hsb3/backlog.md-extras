@@ -29,6 +29,11 @@
 - The wrapper accepts every Backlog.md release in `requirements.json` `tested`
   and the installer installs the one in `pins`. To add a release, follow
   "Upgrade Backlog.md" in doc-1.
+- Upstream's docs are the primary reference for Backlog.md behavior and options,
+  read at the tag of the `requirements.json` pin, not `main`:
+  `gh api 'repos/MrLesk/Backlog.md/contents/ADVANCED-CONFIG.md?ref=v<pin>' -H 'Accept: application/vnd.github.raw'`
+  (config keys; also `README.md`, `CLI-INSTRUCTIONS.md`). Confirm with
+  `backlog <cmd> --help`; never rely on memory or the wrapper for upstream behavior.
 - Releases follow "Release" in doc-1: tag `vX.Y.Z` (annotated) only on a main
   commit whose Tests workflow passed, and never move a tag once its release is
   published.
