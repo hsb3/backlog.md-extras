@@ -80,10 +80,10 @@ Update between sessions with `codex plugin marketplace upgrade backlog-md-extras
 
 ### Backlog.md itself
 
-The plugin does not install Backlog.md. For release 0.7.3's pinned `backlog`, and the wrapper in a terminal (as `bl`, since `backlog` there is npm's), run (needs `gh` signed in):
+The plugin does not install Backlog.md. For release 0.7.4's pinned `backlog`, and the wrapper in a terminal (as `bl`, since `backlog` there is npm's), run (needs `gh` signed in):
 
 ```sh
-gh api -H 'Accept: application/vnd.github.raw' 'repos/hsb3/backlog.md-extras/contents/install.sh?ref=v0.7.3' | sh
+gh api -H 'Accept: application/vnd.github.raw' 'repos/hsb3/backlog.md-extras/contents/install.sh?ref=v0.7.4' | sh
 ```
 
 From a checkout: `./install.sh`. Piped setup resolves the release tag to one commit, then downloads the wrapper, skill, requirements and checker from that commit; it never mixes files from moving refs. For a reviewed branch or commit, set `BACKLOG_EXTRAS_REF` on the installer process; its release identity must still match, and the override is also resolved once. Release tags must be published before the one-liner is available.
