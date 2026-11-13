@@ -115,6 +115,10 @@ Path('.agents/HANDOFF.md').write_text('Board state lives in .backlog/; use the C
 EOF"
 log="$XDG_STATE_HOME/backlog-extras/bypass.log"
 run deny  Bash command "$handoff"
+# issue #4: that deny names its cause and the temp-file remedy; the same script run by path is allowed
+reason=$(jq -n --arg c "$ROOT" --arg cmd "$handoff" '{tool_name: "Bash", cwd: $c, tool_input: {command: $cmd}}' | "$HOOK" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')
+if [[ "$reason" == *"board path appears in interpreter"*"temp file"* ]]; then echo "ok   interpreter deny names cause and remedy"; else echo "FAIL interpreter deny reason: $reason"; fail=1; fi
+run allow Bash command 'python3 /tmp/agents/x/update-handoff.py'
 run deny  Bash command 'BACKLOG_GUARD_BYPASS="" rm .backlog/x'
 run deny  Bash command "BACKLOG_GUARD_BYPASS='  ' rm .backlog/x"
 BACKLOG_GUARD_BYPASS="exported" run deny  Bash command 'rm .backlog/x'

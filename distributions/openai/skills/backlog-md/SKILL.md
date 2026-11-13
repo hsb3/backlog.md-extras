@@ -14,6 +14,7 @@ The board lives in `.backlog/` and records committed work: what will be built, f
 - Read before changing: `backlog task view TASK-123 --plain`. Use `--plain` for reading, `--json` for scripts (`task list`, `task view`, `draft list`, `decision list`, `search`; not with `--plain`).
 - Run `backlog <command> --help` before an unfamiliar command or field, and to see the project's statuses: `backlog task edit --help`.
 - Put text containing backticks in single quotes, so the shell passes it unchanged: `--ac 'Mentions `backlog init` literally'`.
+- Write long or multi-line text (description, plan, notes, a document body) to a temp file and pass it as `--content "$(cat "$f")"`; run a helper script from a file too, not inline. Inline text naming the board can trip the write guard.
 - Do not expand scope silently, and do not create or start follow-up tasks without the user's approval.
 
 ## Pick the workflow
