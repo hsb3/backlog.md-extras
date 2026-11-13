@@ -5,5 +5,4 @@ __pycache__/
 evals/results/
 .DS_Store
 .dev/
-.claude/*.local.md
-_meta/
+.claude/
